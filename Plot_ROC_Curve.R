@@ -1,120 +1,77 @@
+## Install packages if you don't have
+#install("pROC")
+#install("randomForest")
+
 ## Load packages
-# install.packages("pROC") if don't install
 library(pROC)
-# install.packages("randomForest") if don't install
 library(randomForest)
 
 ## Make my results match yours
-set.seed(420)
+set.seed(600)
 
-num.samples <- 100
+nSamples <- 300
 
-## Generate 100 values from a normal distribution with
-## mean 190 and standard deviation 32, then sort them
-weight <- sort(rnorm(n = num.samples, mean = 190, sd = 32))
+## Generate 300 values from a normal distribution with
+## mean 190, sd 32
+wt <- sort(rnorm(n = nSamples, mean = 190, sd = 32))
 
-obese <- ifelse(test = (runif(n = num.samples) < (rank(weight) / num.samples)),
-                yes = 1, no = 0
-)
+ob <- ifelse(test = (runif(n = nSamples) < (rank(wt) / nSamples)),
+             no = 0, yes = 1)
 
-## Plot the data
-plot(x = weight, y = obese)
+## Change the color of the ROC line
+roc(ob,
+    plot = TRUE, glmFit$fitted.values,
+    ylab = "True Percentage", xlab = "False Percentage", 
+    col = "#377eb8", lwd = 5,
+    percent = TRUE, legacy.axes = TRUE)
 
-## Fit a logistic regression to the data...
-glm.fit <- glm(obese ~ weight, family = binomial)
-lines(weight, glm.fit$fitted.values)
+## Determine the area.
+roc(ob,
+    plot = TRUE, glmFit$fitted.values,
+    ylab = "True Postive Percentage", xlab = "False Positive Percentage",
+    col = "#377eb8", print.auc = TRUE, lwd = 5, 
+    percent = TRUE, legacy.axes = TRUE)
 
-roc(obese, glm.fit$fitted.values, plot = TRUE)
-
-## Prints the graph as a square.
-par(pty = "s")
-
-## We can also change the color of the ROC line, and make it wider...
-roc(obese, glm.fit$fitted.values,
-    plot = TRUE,
+## The partial region.
+roc(ob,
+    plot = TRUE, glmFit$fitted.values,
+    ylab = "True Postive Percentage", xlab = "False Positive Percentage", 
+    col = "#377eb8", print.auc.x = 45, lwd = 5, print.auc = TRUE, 
     legacy.axes = TRUE, percent = TRUE,
-    xlab = "False Positive Percentage", ylab = "True Postive Percentage",
-    col = "#377eb8", lwd = 4
-)
+    auc.polygon.col = "#377eb822",
+    auc.polygon = TRUE, partial.auc = c(100, 90))
 
-## If we want to find out the optimal threshold we can store the
-## data used to make the ROC graph in a variable...
-roc.info <- roc(obese, glm.fit$fitted.values, legacy.axes = TRUE)
-str(roc.info)
+#######################################
+##
+## Fit the data
+##
+#######################################
 
-## and then extract just the information that we want from that variable.
-roc.df <- data.frame(
-  tpp = roc.info$sensitivities * 100, ## tpp = true positive percentage
-  fpp = (1 - roc.info$specificities) * 100, ## fpp = false positive precentage
-  thresholds = roc.info$thresholds
-)
+rocModel <- randomForest(factor(ob) ~ wt)
 
-## now let's look at the thresholds between TPP 60% and 80%...
-roc.df[roc.df$tpp > 60 & roc.df$tpp < 80, ]
-
-## We can calculate the area under the curve...
-roc(obese, glm.fit$fitted.values,
-    plot = TRUE,
-    legacy.axes = TRUE, percent = TRUE,
-    xlab = "False Positive Percentage", ylab = "True Postive Percentage",
-    col = "#377eb8", lwd = 4, print.auc = TRUE
-)
-
-## ...and the partial area under the curve.
-roc(obese, glm.fit$fitted.values,
-    plot = TRUE,
-    legacy.axes = TRUE, percent = TRUE,
-    xlab = "False Positive Percentage", ylab = "True Postive Percentage",
-    col = "#377eb8", lwd = 4, print.auc = TRUE, print.auc.x = 45,
-    partial.auc = c(100, 90), auc.polygon = TRUE,
-    auc.polygon.col = "#377eb822"
-)
+roc(ob, plot = TRUE, 
+    rocModel$votes[, 1],
+    percent = TRUE,, legacy.axes = TRUE, 
+    ylab = "True Percentage", xlab = "False Percentage", 
+    col = "#4daf4a", print.auc = TRUE, lwd = 5)
 
 
 #######################################
 ##
-## Now let's fit the data with a random forest...
+## Plot random forest ROC graphs and layer logistic regression graphs.
 ##
 #######################################
-
-rf.model <- randomForest(factor(obese) ~ weight)
-
-## ROC for random forest
-roc(obese, rf.model$votes[, 1],
-    plot = TRUE,
-    legacy.axes = TRUE, percent = TRUE,
-    xlab = "False Positive Percentage", ylab = "True Postive Percentage",
-    col = "#4daf4a", lwd = 4, print.auc = TRUE
-)
-
-
-#######################################
-##
-## Now layer logistic regression and random forest ROC graphs..
-##
-#######################################
-roc(obese, glm.fit$fitted.values,
+roc(ob, percent = TRUE, glmFit$fitted.values,
+    xlab = "False Percentage", col = "#377eb8",
     plot = TRUE, legacy.axes = TRUE,
-    percent = TRUE, xlab = "False Positive Percentage",
-    ylab = "True Postive Percentage", col = "#377eb8",
-    lwd = 4, print.auc = TRUE
-)
+    lwd = 4, print.auc = TRUE,
+    ylab = "True Percentage")
 
-plot.roc(obese, rf.model$votes[, 1],
-         percent = TRUE,
-         col = "#4daf4a", lwd = 4, print.auc = TRUE, add = TRUE,
-         print.auc.y = 40
-)
-legend("bottomright",
-       legend = c("Logisitic Regression", "Random Forest"),
-       col = c("#377eb8", "#4daf4a"), lwd = 4
-)
+plot.roc(ob, rocModel$votes[, 1],
+         col = "#4daf4a", lwd = 4,  add = TRUE, print.auc = TRUE,
+         percent = TRUE, print.auc.y = 40)
 
+legend(legend = c("The Logisitic Regression", "The Random Forest"), "bottomright",
+       col = c("#377eb8", "#4daf4a"), lwd = 5)
 
-#######################################
-##
-## Now that we're done with our ROC fun, let's reset the par() variables.
-## There are two ways to do it...
-##
-#######################################
 par(pty = "m")
